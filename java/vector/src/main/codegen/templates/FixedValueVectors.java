@@ -420,7 +420,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
     @Override
     public ${friendlyType} getObject(int index) {
-      return data.slice(index * ${type.width}, ${type.width})
+      return data.slice(index * ${type.width}, ${type.width});
     }
 
       </#if>

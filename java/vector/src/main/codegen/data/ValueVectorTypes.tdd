@@ -123,6 +123,16 @@
       ]
     },
     {
+      major: "Fixed",
+      width: 16,
+      javaType: "ArrowBuf",
+      boxedType: "ArrowBuf",
+      fields: [{name: "byteWidth", type: "int"}, {name: "index", type: "int"}, {name: "buffer", type: "ArrowBuf"}],
+      minor: [
+        { class: "FixedSizeBinary" , friendlyType: "byte[]" }
+      ]
+    },
+    {
       major: "VarLen",
       width: 4,
       javaType: "int",
