@@ -39,7 +39,9 @@ package org.apache.arrow.vector;
  * ${minor.class} implements a vector of fixed width values.  Elements in the vector are accessed
  * by position, starting from the logical start of the vector.  Values should be pushed onto the
  * vector sequentially, but may be randomly accessed.
+<#if (type.width > 0) >
  *   The width of each element is ${type.width} byte(s)
+</#if>
  *   The equivalent Java primitive is '${minor.javaType!type.javaType}'
  *
  * NB: this class is automatically generated from ${.template_name} and ValueVectorTypes.tdd using FreeMarker.
@@ -47,7 +49,7 @@ package org.apache.arrow.vector;
 public final class ${className} extends BaseDataValueVector implements FixedWidthVector{
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(${className}.class);
 
-  <#if minor.class = "FixedSizeBinary">
+  <#if (type.width < 0)>
   public final int TYPE_WIDTH;
   <#else>
   public static final int TYPE_WIDTH = ${type.width};
@@ -303,9 +305,9 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
   }
 
   public void copyFrom(int fromIndex, int thisIndex, ${className} from){
-    <#if (type.width > 8 || minor.class == "IntervalDay")>
+    <#if (type.width < 0 || type.width > 8 || minor.class == "IntervalDay")>
     from.data.getBytes(fromIndex * TYPE_WIDTH, data, thisIndex * TYPE_WIDTH, TYPE_WIDTH);
-    <#else> <#-- type.width <= 8 -->
+    <#else> <#-- type.width >= 0 && type.width <= 8 -->
     data.set${(minor.javaType!type.javaType)?cap_first}(thisIndex * TYPE_WIDTH,
         from.data.get${(minor.javaType!type.javaType)?cap_first}(fromIndex * TYPE_WIDTH)
     );
@@ -341,7 +343,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
       return false;
     }
 
-    <#if (type.width > 8 || minor.class == "IntervalDay")>
+    <#if (type.width < 0 || type.width > 8 || minor.class == "IntervalDay")>
     public ${minor.javaType!type.javaType} get(int index) {
       <#if (minor.class == "FixedSizeBinary")>
       assert index >= 0;
@@ -436,7 +438,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
     @Override
     public ${friendlyType} getObject(int index) {
-      return null; // TODO: @jingyuan, use get(index)
+      return get(index);
     }
 
       <#else>
@@ -457,7 +459,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
     }
 
       </#if>
-    <#else> <#-- type.width <= 8 -->
+    <#else> <#-- type.width >= 0 && type.width <= 8 -->
 
     public ${minor.javaType!type.javaType} get(int index) {
       return data.get${(minor.javaType!type.javaType)?cap_first}(index * TYPE_WIDTH);
@@ -562,7 +564,9 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
    * ${minor.class}.Mutator implements a mutable vector of fixed width values.  Elements in the
    * vector are accessed by position from the logical start of the vector.  Values should be pushed
    * onto the vector sequentially, but may be randomly accessed.
+  <#if (type.width > 0)>
    *   The width of each element is ${type.width} byte(s)
+  </#if>
    *   The equivalent Java primitive is '${minor.javaType!type.javaType}'
    *
    * NB: this class is automatically generated from FixedValueVectorTypes.tdd using FreeMarker.
@@ -578,12 +582,12 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
     * @param index   position of the bit to set
     * @param value   value to set
     */
-    <#if (type.width > 8) || minor.class == "IntervalDay">
-   public void set(int index, <#if (type.width > 4)>${minor.javaType!type.javaType}<#else>int</#if> value) {
-     data.setBytes(index * ${type.width}, value, 0, ${type.width});
+    <#if (type.width < 0 || type.width > 8 || minor.class == "IntervalDay")>
+   public void set(int index, <#if (type.width < 0 || type.width > 4)>${minor.javaType!type.javaType}<#else>int</#if> value) {
+     data.setBytes(index * TYPE_WIDTH, value, 0, TYPE_WIDTH);
    }
 
-   public void setSafe(int index, <#if (type.width > 4)>${minor.javaType!type.javaType}<#else>int</#if> value) {
+   public void setSafe(int index, <#if (type.width < 0 || type.width > 4)>${minor.javaType!type.javaType}<#else>int</#if> value) {
      while(index >= getValueCapacity()) {
        reAlloc();
      }
@@ -726,7 +730,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
      }
    }
 
-     <#else> <#-- type.width <= 8 -->
+     <#else> <#-- type.width >= 0 && type.width <= 8 -->
    public void set(int index, <#if (type.width >= 4)>${minor.javaType!type.javaType}<#else>int</#if> value) {
      data.set${(minor.javaType!type.javaType)?cap_first}(index * TYPE_WIDTH, value);
    }

@@ -124,7 +124,7 @@
     },
     {
       major: "Fixed",
-      width: 256,
+      width: -1,
       javaType: "byte[]",
       boxedType: "ArrowBuf",
       minor: [

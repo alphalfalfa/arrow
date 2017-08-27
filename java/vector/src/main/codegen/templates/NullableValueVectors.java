@@ -572,7 +572,7 @@ protected final static byte[] emptyByteArray = new byte[]{};
      * @param index   position of the bit to set
      * @param value   array of bytes (or int if smaller than 4 bytes) to write
      */
-    public void set(int index, <#if type.major == "VarLen">byte[]<#elseif (type.width < 4)>int<#else>${minor.javaType!type.javaType}</#if> value) {
+    public void set(int index, <#if type.major == "VarLen">byte[]<#elseif (type.width >= 0 && type.width < 4)>int<#else>${minor.javaType!type.javaType}</#if> value) {
       setCount++;
       final ${valuesName}.Mutator valuesMutator = values.getMutator();
       final BitVector.Mutator bitsMutator = bits.getMutator();
