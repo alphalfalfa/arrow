@@ -124,12 +124,17 @@
     },
     {
       major: "Fixed",
-      width: 16,
-      javaType: "ArrowBuf",
+      width: 256,
+      javaType: "byte[]",
       boxedType: "ArrowBuf",
-      fields: [{name: "byteWidth", type: "int"}, {name: "index", type: "int"}, {name: "buffer", type: "ArrowBuf"}],
       minor: [
-        { class: "FixedSizeBinary" , friendlyType: "byte[]" }
+        {
+          class: "FixedSizeBinary",
+          typeParams: [ {name: "byteWidth", type: "int"} ],
+          arrowType: "org.apache.arrow.vector.types.pojo.ArrowType.FixedSizeBinary",
+          friendlyType: "byte[]",
+          fields: [{name: "index", type: "int", include: false}, {name: "buffer", type: "ArrowBuf"}],
+        }
       ]
     },
     {

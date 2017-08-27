@@ -673,7 +673,7 @@ protected final static byte[] emptyByteArray = new byte[]{};
     }
 
     <#assign fields = minor.fields!type.fields />
-    public void set(int index, int isSet<#list fields as field>, ${field.type} ${field.name}Field</#list> ){
+    public void set(int index, int isSet<#list fields as field><#if field.include!true >, ${field.type} ${field.name}Field</#if></#list> ){
       final ${valuesName}.Mutator valuesMutator = values.getMutator();
       <#if type.major == "VarLen">
       for (int i = lastSet + 1; i < index; i++) {

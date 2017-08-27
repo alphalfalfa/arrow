@@ -47,12 +47,16 @@ package org.apache.arrow.vector;
 public final class ${className} extends BaseDataValueVector implements FixedWidthVector{
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(${className}.class);
 
+  <#if minor.class = "FixedSizeBinary">
+  public final int TYPE_WIDTH;
+  <#else>
   public static final int TYPE_WIDTH = ${type.width};
+  </#if>
 
   private final Accessor accessor = new Accessor();
   private final Mutator mutator = new Mutator();
 
-  private int allocationSizeInBytes = INITIAL_VALUE_ALLOCATION * ${type.width};
+  private int allocationSizeInBytes;
   private int allocationMonitor = 0;
   <#if minor.typeParams??>
 
@@ -63,13 +67,18 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
   public ${className}(String name, BufferAllocator allocator<#list typeParams as typeParam>, ${typeParam.type} ${typeParam.name}</#list>) {
     super(name, allocator);
+    <#if minor.class == "FixedSizeBinary">
+    TYPE_WIDTH = byteWidth;
+    </#if>
     <#list typeParams as typeParam>
     this.${typeParam.name} = ${typeParam.name};
     </#list>
+    allocationSizeInBytes = INITIAL_VALUE_ALLOCATION * TYPE_WIDTH;
   }
   <#else>
   public ${className}(String name, BufferAllocator allocator) {
     super(name, allocator);
+    allocationSizeInBytes = INITIAL_VALUE_ALLOCATION * TYPE_WIDTH;
   }
   </#if>
 
@@ -93,7 +102,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
     if (valueCount == 0) {
       return 0;
     }
-    return valueCount * ${type.width};
+    return valueCount * TYPE_WIDTH;
   }
 
   @Override
@@ -116,7 +125,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
   @Override
   public int getValueCapacity(){
-    return (int) (data.capacity() *1.0 / ${type.width});
+    return (int) (data.capacity() *1.0 / TYPE_WIDTH);
   }
 
   @Override
@@ -135,7 +144,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
   @Override
   public void setInitialCapacity(final int valueCount) {
-    final long size = 1L * valueCount * ${type.width};
+    final long size = 1L * valueCount * TYPE_WIDTH;
     if (size > MAX_ALLOCATION_SIZE) {
       throw new OversizedAllocationException("Requested amount of memory is more than max allowed allocation size");
     }
@@ -179,12 +188,12 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
    */
   @Override
   public void allocateNew(final int valueCount) {
-    allocateBytes(valueCount * ${type.width});
+    allocateBytes(valueCount * TYPE_WIDTH);
   }
 
   @Override
   public void reset() {
-    allocationSizeInBytes = INITIAL_VALUE_ALLOCATION * ${type.width};
+    allocationSizeInBytes = INITIAL_VALUE_ALLOCATION * TYPE_WIDTH;
     allocationMonitor = 0;
     zeroVector();
     super.reset();
@@ -254,8 +263,8 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
   }
 
   public void splitAndTransferTo(int startIndex, int length, ${className} target) {
-    final int startPoint = startIndex * ${type.width};
-    final int sliceLength = length * ${type.width};
+    final int startPoint = startIndex * TYPE_WIDTH;
+    final int sliceLength = length * TYPE_WIDTH;
     target.clear();
     target.data = data.slice(startPoint, sliceLength).transferOwnership(target.allocator).buffer;
     target.data.writerIndex(sliceLength);
@@ -295,10 +304,10 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
   public void copyFrom(int fromIndex, int thisIndex, ${className} from){
     <#if (type.width > 8 || minor.class == "IntervalDay")>
-    from.data.getBytes(fromIndex * ${type.width}, data, thisIndex * ${type.width}, ${type.width});
+    from.data.getBytes(fromIndex * TYPE_WIDTH, data, thisIndex * TYPE_WIDTH, TYPE_WIDTH);
     <#else> <#-- type.width <= 8 -->
-    data.set${(minor.javaType!type.javaType)?cap_first}(thisIndex * ${type.width},
-        from.data.get${(minor.javaType!type.javaType)?cap_first}(fromIndex * ${type.width})
+    data.set${(minor.javaType!type.javaType)?cap_first}(thisIndex * TYPE_WIDTH,
+        from.data.get${(minor.javaType!type.javaType)?cap_first}(fromIndex * TYPE_WIDTH)
     );
     </#if> <#-- type.width -->
   }
@@ -324,7 +333,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
   public final class Accessor extends BaseDataValueVector.BaseAccessor {
     @Override
     public int getValueCount() {
-      return data.writerIndex() / ${type.width};
+      return data.writerIndex() / TYPE_WIDTH;
     }
 
     @Override
@@ -334,18 +343,25 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
     <#if (type.width > 8 || minor.class == "IntervalDay")>
     public ${minor.javaType!type.javaType} get(int index) {
-      return data.slice(index * ${type.width}, ${type.width});
+      <#if (minor.class == "FixedSizeBinary")>
+      assert index >= 0;
+      final byte[] dst = new byte[TYPE_WIDTH];
+      data.getBytes(index * TYPE_WIDTH, dst, 0, TYPE_WIDTH);
+      return dst;
+      <#else>
+      return data.slice(index * TYPE_WIDTH, TYPE_WIDTH);
+      </#if>
     }
 
       <#if (minor.class == "IntervalDay")>
     public void get(int index, ${minor.class}Holder holder){
-      final int offsetIndex = index * ${type.width};
+      final int offsetIndex = index * TYPE_WIDTH;
       holder.days = data.getInt(offsetIndex);
       holder.milliseconds = data.getInt(offsetIndex + ${minor.millisecondsOffset});
     }
 
     public void get(int index, Nullable${minor.class}Holder holder){
-      final int offsetIndex = index * ${type.width};
+      final int offsetIndex = index * TYPE_WIDTH;
       holder.isSet = 1;
       holder.days = data.getInt(offsetIndex);
       holder.milliseconds = data.getInt(offsetIndex + ${minor.millisecondsOffset});
@@ -353,7 +369,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
     @Override
     public ${friendlyType} getObject(int index) {
-      final int offsetIndex = index * ${type.width};
+      final int offsetIndex = index * TYPE_WIDTH;
       final int millis = data.getInt(offsetIndex + ${minor.millisecondsOffset});
       final int  days   = data.getInt(offsetIndex);
       final Period p = new Period();
@@ -361,7 +377,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
     }
 
     public StringBuilder getAsStringBuilder(int index) {
-      final int offsetIndex = index * ${type.width};
+      final int offsetIndex = index * TYPE_WIDTH;
 
       int millis = data.getInt(offsetIndex + ${minor.millisecondsOffset});
       final int  days   = data.getInt(offsetIndex);
@@ -387,7 +403,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
       <#elseif minor.class == "Decimal">
     public void get(int index, ${minor.class}Holder holder) {
-        holder.start = index * ${type.width};
+        holder.start = index * TYPE_WIDTH;
         holder.buffer = data;
         holder.scale = scale;
         holder.precision = precision;
@@ -395,7 +411,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
     public void get(int index, Nullable${minor.class}Holder holder) {
         holder.isSet = 1;
-        holder.start = index * ${type.width};
+        holder.start = index * TYPE_WIDTH;
         holder.buffer = data;
         holder.scale = scale;
         holder.precision = precision;
@@ -403,35 +419,52 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
     @Override
     public ${friendlyType} getObject(int index) {
-      return org.apache.arrow.vector.util.DecimalUtility.getBigDecimalFromArrowBuf(data, ${type.width} * index, scale);
+      return org.apache.arrow.vector.util.DecimalUtility.getBigDecimalFromArrowBuf(data, TYPE_WIDTH * index, scale);
+    }
+
+      <#elseif minor.class == "FixedSizeBinary">
+    public void get(int index, ${minor.class}Holder holder) {
+      holder.index = index;
+      holder.buffer = data;
+    }
+
+    public void get(int index, Nullable${minor.class}Holder holder) {
+      holder.isSet = 1;
+      holder.index = index;
+      holder.buffer = data;
+    }
+
+    @Override
+    public ${friendlyType} getObject(int index) {
+      return null; // TODO: @jingyuan, use get(index)
     }
 
       <#else>
     public void get(int index, ${minor.class}Holder holder){
       holder.buffer = data;
-      holder.start = index * ${type.width};
+      holder.start = index * TYPE_WIDTH;
     }
 
     public void get(int index, Nullable${minor.class}Holder holder){
       holder.isSet = 1;
       holder.buffer = data;
-      holder.start = index * ${type.width};
+      holder.start = index * TYPE_WIDTH;
     }
 
     @Override
     public ${friendlyType} getObject(int index) {
-      return data.slice(index * ${type.width}, ${type.width});
+      return data.slice(index * TYPE_WIDTH, TYPE_WIDTH);
     }
 
       </#if>
     <#else> <#-- type.width <= 8 -->
 
     public ${minor.javaType!type.javaType} get(int index) {
-      return data.get${(minor.javaType!type.javaType)?cap_first}(index * ${type.width});
+      return data.get${(minor.javaType!type.javaType)?cap_first}(index * TYPE_WIDTH);
     }
       <#if type.width == 4>
     public long getTwoAsLong(int index) {
-      return data.getLong(index * ${type.width});
+      return data.getLong(index * TYPE_WIDTH);
     }
 
       </#if>
@@ -514,12 +547,12 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
       </#if>
     public void get(int index, ${minor.class}Holder holder){
-      holder.value = data.get${(minor.javaType!type.javaType)?cap_first}(index * ${type.width});
+      holder.value = data.get${(minor.javaType!type.javaType)?cap_first}(index * TYPE_WIDTH);
     }
 
     public void get(int index, Nullable${minor.class}Holder holder){
       holder.isSet = 1;
-      holder.value = data.get${(minor.javaType!type.javaType)?cap_first}(index * ${type.width});
+      holder.value = data.get${(minor.javaType!type.javaType)?cap_first}(index * TYPE_WIDTH);
     }
 
     </#if> <#-- type.width -->
@@ -554,12 +587,12 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
      while(index >= getValueCapacity()) {
        reAlloc();
      }
-     data.setBytes(index * ${type.width}, value, 0, ${type.width});
+     data.setBytes(index * TYPE_WIDTH, value, 0, TYPE_WIDTH);
    }
 
       <#if (minor.class == "IntervalDay")>
    public void set(int index, int days, int milliseconds){
-     final int offsetIndex = index * ${type.width};
+     final int offsetIndex = index * TYPE_WIDTH;
      data.setInt(offsetIndex, days);
      data.setInt((offsetIndex + ${minor.millisecondsOffset}), milliseconds);
    }
@@ -611,7 +644,40 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
    }
 
    public void set(int index, int start, ArrowBuf buffer){
-     data.setBytes(index * ${type.width}, buffer, start, ${type.width});
+     data.setBytes(index * TYPE_WIDTH, buffer, start, TYPE_WIDTH);
+   }
+
+      <#elseif minor.class == "FixedSizeBinary">
+  public void set(int index, ${minor.class}Holder holder){
+    assert index == holder.index;
+    set(index, holder.buffer);
+  }
+
+  void set(int index, Nullable${minor.class}Holder holder){
+    assert index == holder.index;
+    set(index, holder.buffer);
+  }
+
+  public void setSafe(int index,  Nullable${minor.class}Holder holder){
+    assert index == holder.index;
+    setSafe(index, holder.buffer);
+  }
+
+  public void setSafe(int index,  ${minor.class}Holder holder){
+    assert index == holder.index;
+    setSafe(index, holder.buffer);
+  }
+
+  public void setSafe(int index, ArrowBuf buffer){
+    while(index >= getValueCapacity()) {
+      reAlloc();
+    }
+    set(index, buffer);
+  }
+
+   public void set(int index, ArrowBuf buffer){
+     int start = index * TYPE_WIDTH;
+     buffer.getBytes(start, data, start, TYPE_WIDTH); //TODO: @jingyuan, check start and outputStart
    }
 
        <#else>
@@ -624,7 +690,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
    }
 
    public void set(int index, int start, ArrowBuf buffer){
-     data.setBytes(index * ${type.width}, buffer, start, ${type.width});
+     data.setBytes(index * TYPE_WIDTH, buffer, start, TYPE_WIDTH);
    }
 
    public void setSafe(int index, ${minor.class}Holder holder){
@@ -643,7 +709,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
    }
 
    public void set(int index, Nullable${minor.class}Holder holder){
-     data.setBytes(index * ${type.width}, holder.buffer, holder.start, ${type.width});
+     data.setBytes(index * TYPE_WIDTH, holder.buffer, holder.start, TYPE_WIDTH);
    }
        </#if>
 
@@ -654,7 +720,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
      final int valueCount = getAccessor().getValueCount();
      for(int i = 0; i < valueCount; i++, even = !even) {
        final byte b = even ? Byte.MIN_VALUE : Byte.MAX_VALUE;
-       for(int w = 0; w < ${type.width}; w++){
+       for(int w = 0; w < TYPE_WIDTH; w++){
          data.setByte(i + w, b);
        }
      }
@@ -662,7 +728,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
 
      <#else> <#-- type.width <= 8 -->
    public void set(int index, <#if (type.width >= 4)>${minor.javaType!type.javaType}<#else>int</#if> value) {
-     data.set${(minor.javaType!type.javaType)?cap_first}(index * ${type.width}, value);
+     data.set${(minor.javaType!type.javaType)?cap_first}(index * TYPE_WIDTH, value);
    }
 
    public void setSafe(int index, <#if (type.width >= 4)>${minor.javaType!type.javaType}<#else>int</#if> value) {
@@ -673,7 +739,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
    }
 
    protected void set(int index, ${minor.class}Holder holder){
-     data.set${(minor.javaType!type.javaType)?cap_first}(index * ${type.width}, holder.value);
+     data.set${(minor.javaType!type.javaType)?cap_first}(index * TYPE_WIDTH, holder.value);
    }
 
    public void setSafe(int index, ${minor.class}Holder holder){
@@ -684,7 +750,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
    }
 
    protected void set(int index, Nullable${minor.class}Holder holder){
-     data.set${(minor.javaType!type.javaType)?cap_first}(index * ${type.width}, holder.value);
+     data.set${(minor.javaType!type.javaType)?cap_first}(index * TYPE_WIDTH, holder.value);
    }
 
    public void setSafe(int index, Nullable${minor.class}Holder holder){
@@ -726,7 +792,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
    @Override
    public void setValueCount(int valueCount) {
      final int currentValueCapacity = getValueCapacity();
-     final int idx = (${type.width} * valueCount);
+     final int idx = (TYPE_WIDTH * valueCount);
      while(valueCount > getValueCapacity()) {
        reAlloc();
      }
@@ -736,7 +802,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
        allocationMonitor = 0;
      }
      VectorTrimmer.trim(data, idx);
-     data.writerIndex(valueCount * ${type.width});
+     data.writerIndex(valueCount * TYPE_WIDTH);
    }
  }
 }
