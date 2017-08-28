@@ -157,7 +157,7 @@ public class TypeLayout {
 
       @Override
       public TypeLayout visit(ArrowType.FixedSizeBinary type) {
-        return newFixedWidthTypeLayout(dataVector(type.getByteWidth() * 8));
+        return newFixedWidthTypeLayout(dataVector(type.getByteWidth() * 8)); //TODO: #jingyuan, following Decimal type, check if correct
       }
 
       @Override
