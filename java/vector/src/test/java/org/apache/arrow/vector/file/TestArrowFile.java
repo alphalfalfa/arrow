@@ -18,28 +18,11 @@
 
 package org.apache.arrow.vector.file;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.NullableFloat4Vector;
-import org.apache.arrow.vector.NullableIntVector;
-import org.apache.arrow.vector.NullableTinyIntVector;
-import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.*;
 import org.apache.arrow.vector.complex.FixedSizeListVector;
 import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.complex.NullableMapVector;
@@ -53,6 +36,7 @@ import org.apache.arrow.vector.stream.MessageSerializerTest;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
 import org.apache.arrow.vector.types.Types.MinorType;
 import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.ArrowType.FixedSizeBinary;
 import org.apache.arrow.vector.types.pojo.ArrowType.FixedSizeList;
 import org.apache.arrow.vector.types.pojo.ArrowType.Int;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -62,6 +46,12 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class TestArrowFile extends BaseFileTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(TestArrowFile.class);
@@ -560,6 +550,64 @@ public class TestArrowFile extends BaseFileTest {
       LOGGER.debug("reading schema: " + schema);
       Assert.assertTrue(arrowReader.loadNextBatch());
       validateNestedDictionary(root, arrowReader);
+    }
+  }
+
+  @Test
+  public void testWriteReadFixedSizeBinary() throws IOException {
+    File file = new File("target/mytest_fixed_size_binary.arrow");
+    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+    final int numValues = 10;
+    final int typeWidth = 11;
+    byte[][] byteValues = new byte[numValues][typeWidth];
+    for (int i=0; i<numValues; i++) {
+      for (int j=0; j<typeWidth; j++) {
+        byteValues[i][j] = ((byte) i);
+      }
+    }
+
+    // write
+    try (BufferAllocator originalVectorAllocator = allocator.newChildAllocator("original vectors", 0, Integer.MAX_VALUE);
+         NullableMapVector parent = NullableMapVector.empty("parent", originalVectorAllocator)) {
+      NullableFixedSizeBinaryVector fixedSizeBinaryVector = parent.addOrGet("fixed-binary", FieldType.nullable(new FixedSizeBinary(typeWidth)), NullableFixedSizeBinaryVector.class);
+      parent.allocateNew();
+      for (int i=0; i<numValues; i++) {
+        fixedSizeBinaryVector.getMutator().set(i, byteValues[i]);
+      }
+      parent.getMutator().setValueCount(numValues);
+      write(parent, file, stream);
+    }
+
+    // read
+    try (BufferAllocator readerAllocator = allocator.newChildAllocator("reader", 0, Integer.MAX_VALUE);
+         FileInputStream fileInputStream = new FileInputStream(file);
+         ArrowFileReader arrowReader = new ArrowFileReader(fileInputStream.getChannel(), readerAllocator)) {
+      VectorSchemaRoot root = arrowReader.getVectorSchemaRoot();
+      Schema schema = root.getSchema();
+      LOGGER.debug("reading schema: " + schema);
+
+      for (ArrowBlock rbBlock : arrowReader.getRecordBlocks()) {
+        arrowReader.loadRecordBatch(rbBlock);
+        Assert.assertEquals(numValues, root.getRowCount());
+        for (int i = 0; i < numValues; i++) {
+          byte[] value = (byte[]) root.getVector("fixed-binary").getAccessor().getObject(i);
+          Assert.assertArrayEquals(byteValues[i], ((byte[]) root.getVector("fixed-binary").getAccessor().getObject(i)));
+        }
+      }
+    }
+
+    // read from stream
+    try (BufferAllocator readerAllocator = allocator.newChildAllocator("reader", 0, Integer.MAX_VALUE);
+         ByteArrayInputStream input = new ByteArrayInputStream(stream.toByteArray());
+         ArrowStreamReader arrowReader = new ArrowStreamReader(input, readerAllocator)) {
+      VectorSchemaRoot root = arrowReader.getVectorSchemaRoot();
+      Schema schema = root.getSchema();
+      LOGGER.debug("reading schema: " + schema);
+      arrowReader.loadNextBatch();
+      Assert.assertEquals(numValues, root.getRowCount());
+      for (int i = 0; i < numValues; i++) {
+        Assert.assertArrayEquals(byteValues[i], ((byte[]) root.getVector("fixed-binary").getAccessor().getObject(i)));
+      }
     }
   }
 
