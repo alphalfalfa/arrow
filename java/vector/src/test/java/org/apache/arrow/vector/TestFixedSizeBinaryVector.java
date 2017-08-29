@@ -76,14 +76,12 @@ public class TestFixedSizeBinaryVector {
         try {
             fixedSizeBinaryVector.getMutator().set(0, smallBytes);
             fail("Only " + type.getByteWidth() + "-byte input data should be allowed");
-        } catch (Exception e) {
-            System.out.println(e);
+        } catch (AssertionError ignore) {
         }
         try {
             fixedSizeBinaryVector.getMutator().set(0, largeBytes);
             fail("Only " + type.getByteWidth() + "-byte input data should be allowed");
-        } catch (Exception e) {
-            System.out.println(e);
+        } catch (AssertionError ignore) {
         }
     }
 

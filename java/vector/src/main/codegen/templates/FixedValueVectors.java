@@ -584,6 +584,9 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
     */
     <#if (type.width < 0 || type.width > 8 || minor.class == "IntervalDay")>
    public void set(int index, <#if (type.width < 0 || type.width > 4)>${minor.javaType!type.javaType}<#else>int</#if> value) {
+     <#if minor.class == "FixedSizeBinary">
+     assert TYPE_WIDTH == value.length;
+     </#if>
      data.setBytes(index * TYPE_WIDTH, value, 0, TYPE_WIDTH);
    }
 
@@ -591,7 +594,7 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
      while(index >= getValueCapacity()) {
        reAlloc();
      }
-     data.setBytes(index * TYPE_WIDTH, value, 0, TYPE_WIDTH);
+     set(index, value);
    }
 
       <#if (minor.class == "IntervalDay")>
@@ -680,8 +683,9 @@ public final class ${className} extends BaseDataValueVector implements FixedWidt
   }
 
    public void set(int index, ArrowBuf buffer){
+     assert TYPE_WIDTH == buffer.capacity();
      int start = index * TYPE_WIDTH;
-     buffer.getBytes(start, data, start, TYPE_WIDTH); //TODO: @jingyuan, check start and outputStart
+     buffer.getBytes(start, data, start, TYPE_WIDTH);
    }
 
        <#else>
