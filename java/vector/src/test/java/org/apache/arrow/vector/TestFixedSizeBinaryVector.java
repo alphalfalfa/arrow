@@ -18,9 +18,13 @@
 
 package org.apache.arrow.vector;
 
+import io.netty.buffer.ArrowBuf;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.holders.FixedSizeBinaryHolder;
 import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertArrayEquals;
@@ -38,6 +42,11 @@ public class TestFixedSizeBinaryVector {
                 byteValues[i][j] = ((byte) i);
             }
         }
+    }
+
+    @Before
+    public void setUp() throws Exception {
+
     }
 
     @Test
@@ -58,31 +67,102 @@ public class TestFixedSizeBinaryVector {
     }
 
     @Test
-    public void testInputWithWrongSize() {
+    public void testMutator() {
         BufferAllocator allocator = new RootAllocator(Integer.MAX_VALUE);
         ArrowType.FixedSizeBinary type = new ArrowType.FixedSizeBinary(typeWidth);
         NullableFixedSizeBinaryVector fixedSizeBinaryVector = TestUtils.newVector(NullableFixedSizeBinaryVector.class,
                 "fixedSizeBinary", type, allocator);
         fixedSizeBinaryVector.allocateNew();
-        byte[] smallBytes = new byte[typeWidth - 2];
-        for (int i=0; i<smallBytes.length; i++) {
+
+        int smallTypeWidth = typeWidth - 2;
+        byte[] smallBytes = new byte[smallTypeWidth];
+        for (int i = 0; i< smallTypeWidth; i++) {
             smallBytes[i] = ((byte) i);
         }
-        byte[] largeBytes = new byte[typeWidth + 2];
-        for (int i=0; i<largeBytes.length; i++) {
+
+
+        int largeTypeWidth = typeWidth + 2;
+        byte[] largeBytes = new byte[largeTypeWidth];
+        for (int i = 0; i< largeTypeWidth; i++) {
             largeBytes[i] = ((byte) i);
         }
 
+        ArrowBuf smallBuf = allocator.buffer(smallTypeWidth);
+        smallBuf.setBytes(0, smallBytes);
+
+        ArrowBuf largeBuf = allocator.buffer(largeTypeWidth);
+        smallBuf.setBytes(0, smallBytes);
+
+        FixedSizeBinaryHolder smallHolder = new FixedSizeBinaryHolder();
+        smallHolder.byteWidth = smallTypeWidth;
+        smallHolder.index = 0;
+        smallHolder.buffer = smallBuf;
+
+        FixedSizeBinaryHolder largeHolder = new FixedSizeBinaryHolder();
+        largeHolder.byteWidth = largeTypeWidth;
+        largeHolder.index = 0;
+        largeHolder.buffer = largeBuf;
+
+        String errorMsg = "Only " + type.getByteWidth() + "-byte input data should be allowed";
+        NullableFixedSizeBinaryVector.Mutator mutator = fixedSizeBinaryVector.getMutator();
+
         try {
-            fixedSizeBinaryVector.getMutator().set(0, smallBytes);
-            fail("Only " + type.getByteWidth() + "-byte input data should be allowed");
-        } catch (AssertionError ignore) {
-        }
+            mutator.set(0, smallBytes);
+            fail(errorMsg);
+        } catch (AssertionError ignore) {}
         try {
-            fixedSizeBinaryVector.getMutator().set(0, largeBytes);
-            fail("Only " + type.getByteWidth() + "-byte input data should be allowed");
-        } catch (AssertionError ignore) {
-        }
+            mutator.set(0, largeBytes);
+            fail(errorMsg);
+        } catch (AssertionError ignore) {}
+
+        try {
+            mutator.set(0, smallHolder);
+            fail(errorMsg);
+        } catch (AssertionError ignore) {}
+
+        try {
+            mutator.set(0, largeHolder);
+            fail(errorMsg);
+        } catch (AssertionError ignore) {}
+
+        try {
+            mutator.set(0, 1, smallBuf);
+            fail(errorMsg);
+        } catch (AssertionError ignore) {}
+
+        try {
+            mutator.set(0, 1, largeBuf);
+            fail(errorMsg);
+        } catch (AssertionError ignore) {}
+
+        try {
+            mutator.setSafe(0, smallBytes);
+            fail(errorMsg);
+        } catch (AssertionError ignore) {}
+        try {
+            mutator.setSafe(0, largeBytes);
+            fail(errorMsg);
+        } catch (AssertionError ignore) {}
+
+        try {
+            mutator.setSafe(0, smallHolder);
+            fail(errorMsg);
+        } catch (AssertionError ignore) {}
+
+        try {
+            mutator.setSafe(0, largeHolder);
+            fail(errorMsg);
+        } catch (AssertionError ignore) {}
+
+        try {
+            mutator.setSafe(0, 1, smallBuf);
+            fail(errorMsg);
+        } catch (AssertionError ignore) {}
+
+        try {
+            mutator.setSafe(0, 1, largeBuf);
+            fail(errorMsg);
+        } catch (AssertionError ignore) {}
     }
 
 }
